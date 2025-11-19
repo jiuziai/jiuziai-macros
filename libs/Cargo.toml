@@ -6,7 +6,7 @@ authors = ["jiuziai <jiuziai@qq.com>"]
 description = "运行时验证 helpers 和 Validate trait 实现"
 license = "MIT OR Apache-2.0"
 readme = "../README.md"
-repository = "https://github.com/<yourname>/jiuziai-macros"
+repository = "https://github.com/jiuziai/jiuziai-macros"
 keywords = ["validation","derive","macros"]
 
 [dependencies]

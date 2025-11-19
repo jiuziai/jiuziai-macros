@@ -6,7 +6,7 @@ authors = ["jiuziai <jiuziai@qq.com>"]
 description = "派生宏 #[derive(Validate)] 的实现，用于声明式字段校验"
 license = "MIT OR Apache-2.0"
 readme = "../README.md"
-repository = "https://github.com/<yourname>/jiuziai-macros"
+repository = "https://github.com/jiuziai/jiuziai-macros"
 keywords = ["validation","derive","proc-macro"]
 
 [lib]
