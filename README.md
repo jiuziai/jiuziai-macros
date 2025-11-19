@@ -41,7 +41,24 @@ jiuziai-validator = { git = "https://github.com/<yourname>/jiuziai-macros.git", 
 jiuziai-validator = "0.1.0"
 ```
 
-用法示例：派生宏 `Validate`
+安装与使用（crates.io / git）
+
+从 crates.io 安装（推荐稳定依赖）：
+
+```toml
+[dependencies]
+jiuziai-macro-libs = "0.0.1"
+jiuziai-validator = "0.0.1"
+```
+
+使用 Git 仓库中的最新版（开发版本）：
+
+```toml
+[dependencies]
+jiuziai-validator = { git = "https://github.com/jiuziai/jiuziai-macros.git", package = "jiuziai-validator", branch = "main" }
+```
+
+示例：派生宏 `Validate`
 
 ```rust
 use jiuziai_validator::Validate;
