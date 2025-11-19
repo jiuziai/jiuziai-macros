@@ -1,8 +1,13 @@
 [package]
 name = "jiuziai-macro-libs"
-version.workspace = true
-edition.workspace = true
-authors.workspace = true
+version = "0.0.1"
+edition = "2024"
+authors = ["jiuziai <jiuziai@qq.com>"]
+description = "运行时验证 helpers 和 Validate trait 实现"
+license = "MIT OR Apache-2.0"
+readme = "../README.md"
+repository = "https://github.com/<yourname>/jiuziai-macros"
+keywords = ["validation","derive","macros"]
 
 [dependencies]
 quote.workspace = true
@@ -13,3 +18,5 @@ serde_with.workspace = true
 serde.workspace = true
 dyn-clone.workspace = true
 regex.workspace = true
+
+ 

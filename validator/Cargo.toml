@@ -1,8 +1,13 @@
 [package]
 name = "jiuziai-validator"
-version.workspace = true
-edition.workspace = true
-authors.workspace = true
+version = "0.0.1"
+edition = "2024"
+authors = ["jiuziai <jiuziai@qq.com>"]
+description = "派生宏 #[derive(Validate)] 的实现，用于声明式字段校验"
+license = "MIT OR Apache-2.0"
+readme = "../README.md"
+repository = "https://github.com/<yourname>/jiuziai-macros"
+keywords = ["validation","derive","proc-macro"]
 
 [lib]
 proc-macro = true
@@ -17,3 +22,5 @@ serde.workspace = true
 dyn-clone.workspace = true
 num_enum.workspace = true
 jiuziai-macro-libs.workspace = true
+
+ 
