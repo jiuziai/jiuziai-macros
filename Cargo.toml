@@ -1,0 +1,60 @@
+[workspace.package]
+name = "jiuziai-macros"
+version = "0.0.1"
+edition = "2024"
+authors = ["jiuziai <jiuziai@qq.com>"]
+
+[workspace]
+members = [
+    "libs",
+    "validator"
+]
+
+[workspace.dependencies]
+quote = "1.0.42"
+syn = { version = "2.0.110", features = ["full"] }
+proc-macro2 = "1.0.103"
+serde_json = "1.0.145"
+serde_with = "3.16.0"
+serde = { version = "1.0.228", features = ["derive"] }
+dyn-clone = "1.0.20"
+num_enum = "0.7.5"
+regex = "1.11.0"
+
+jiuziai-macro-libs = { path = "libs" }
+jiuziai-validator = { path = "validator" }
+
+
+
+
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
+overflow-checks = true
+debug = false
+incremental = false
+rpath = false
+debug-assertions = false
+
+
+[profile.dev]
+opt-level = 1
+debug = true
+overflow-checks = true
+debug-assertions = true
+incremental = true
+rpath = false
+panic = "unwind"
+
+[profile.test]
+opt-level = 0
+debug = true
+overflow-checks = true
+debug-assertions = true
+incremental = true
+rpath = false
+panic = "unwind"

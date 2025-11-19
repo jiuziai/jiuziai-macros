@@ -1,0 +1,1 @@
+for<'a> fn(&'a ParseBuffer<'a>) -> Result<syn::punctuated::Punctuated<Meta, syn::token::Comma>, syn::Error> {syn::punctuated::Punctuated::<Meta, syn::token::Comma>::parse_terminated}
