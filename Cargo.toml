@@ -19,6 +19,10 @@ regex = "1.11.0"
 jiuziai-macro-libs = { path = "libs" }
 jiuziai-validator = { path = "validator" }
 
+[patch.crates-io]
+# During local development, override the registry version with the local path
+jiuziai-macro-libs = { path = "libs" }
+
 
 [profile.release]
 opt-level = "z"
