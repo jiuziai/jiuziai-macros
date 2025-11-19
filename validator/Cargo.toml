@@ -21,6 +21,6 @@ serde_with.workspace = true
 serde.workspace = true
 dyn-clone.workspace = true
 num_enum.workspace = true
-jiuziai-macro-libs.workspace = true
+jiuziai-macro-libs = "0.0.1"
 
  
