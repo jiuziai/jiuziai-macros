@@ -1,0 +1,32 @@
+# Rust / Cargo
+/target/
+**/target/
+
+# incremental / debug artifacts
+/debug/
+**/debug/
+
+# JetBrains IDEs and VSCode
+.idea/
+.vscode/
+
+# macOS
+.DS_Store
+
+# Lockfile
+# For libraries, it's common to NOT check in `Cargo.lock`.
+Cargo.lock
+
+# Logs and temporary
+*.log
+*.tmp
+
+# Node / web
+node_modules/
+
+# Environment
+.env
+
+# Editor-specific
+*.sublime-workspace
+*.sublime-project
