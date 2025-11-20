@@ -160,7 +160,7 @@ git push origin v0.1.0
 
 ```bash
 cargo publish -p jiuziai-macro-libs
-cargo publish -p jiuziai-validator
+cargo publish -p jiuziai-core
 ```
 
 CI 建议（GitHub Actions）：在 push/PR 触发下运行：

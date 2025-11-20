@@ -219,13 +219,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4a5f13b858c8d314ee3e8f639011f7ccefe71f97f96e50151fb991f267928e2c"
 
 [[package]]
-name = "jiuziai-macro-libs"
+name = "jiuziai-macro-core"
 version = "0.0.1"
 dependencies = [
  "dyn-clone",
+ "jiuziai-macro-libs",
+ "num_enum",
+ "once_cell",
  "proc-macro2",
  "quote",
  "regex",
+ "regex-syntax",
  "serde",
  "serde_json",
  "serde_with",
@@ -233,14 +237,14 @@ dependencies = [
 ]
 
 [[package]]
-name = "jiuziai-validator"
+name = "jiuziai-macro-libs"
 version = "0.0.1"
 dependencies = [
  "dyn-clone",
- "jiuziai-macro-libs",
- "num_enum",
  "proc-macro2",
  "quote",
+ "regex",
+ "regex-syntax",
  "serde",
  "serde_json",
  "serde_with",
