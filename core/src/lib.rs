@@ -5,15 +5,22 @@ mod validate;
 use crate::regex::tokens::*;
 use crate::validate::tokens::*;
 use proc_macro::TokenStream;
-use syn::{parse_macro_input, DeriveInput, ItemMod};
+use syn::{DeriveInput, ItemMod, parse_macro_input};
 
 /// 结构体验证派生宏 [派生宏](https://doc.rust-lang.org/stable/proc_macro/index.html)
-/// len, range, no_space, not_empty, not_blank, regex, enums, func
-#[proc_macro_derive(Validate, attributes(validate))]
+#[proc_macro_derive(
+    Validate,
+    attributes(
+        func, not_blank, not_empty, no_space, range, regex, required, size, within, exclude, deep,
+        message, group
+    )
+)]
 pub fn derive_validate(input: TokenStream) -> TokenStream {
-    TokenStream::from(derive_validate_gen(parse_macro_input!(
-        input as DeriveInput
-    )))
+    let input = parse_macro_input!(input as DeriveInput);
+    match derive_validate_internal(input) {
+        Ok(tokens) => TokenStream::from(tokens),
+        Err(err) => err.to_compile_error().into(),
+    }
 }
 
 /// 正则规则懒加载编译器验证 [属性宏](https://doc.rust-lang.org/stable/proc_macro/index.html)
