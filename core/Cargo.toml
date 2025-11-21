@@ -25,4 +25,7 @@ jiuziai-macro-libs = { path = "../libs" }
 regex.workspace = true
 regex-syntax.workspace = true
 once_cell.workspace = true
- 
+rust_decimal.workspace = true
+chrono.workspace = true
+rust_decimal_macros.workspace = true
+lazy_static.workspace = true
