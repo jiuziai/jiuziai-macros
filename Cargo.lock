@@ -355,6 +355,7 @@ dependencies = [
  "chrono",
  "dyn-clone",
  "lazy_static",
+ "once_cell",
  "proc-macro2",
  "quote",
  "regex",

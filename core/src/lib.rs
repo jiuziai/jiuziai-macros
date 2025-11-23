@@ -1,22 +1,26 @@
 extern crate proc_macro;
-mod regex;
+mod error;
+mod regex_pool;
 mod validator;
 
-use crate::validator::tokens::*;
-use crate::regex::tokens::*;
+use crate::validator::entry::derive_validate_entry;
 use proc_macro::TokenStream;
-use syn::{parse_macro_input, DeriveInput, ItemMod};
+use syn::{DeriveInput, parse_macro_input};
 
 /// 结构体验证派生宏 [派生宏](https://doc.rust-lang.org/stable/proc_macro/index.html)
-#[proc_macro_derive(
-    Validator,
-    attributes(check)
-)]
+#[proc_macro_derive(Validator, attributes(check))]
 pub fn derive_validate(input: TokenStream) -> TokenStream {
-   TokenStream::from(derive_validate_gen(parse_macro_input!(input as DeriveInput)))
+    derive_validate_entry(parse_macro_input!(input as DeriveInput)).into()
 }
-/// 正则规则懒加载编译器验证 [属性宏](https://doc.rust-lang.org/stable/proc_macro/index.html)
-#[proc_macro_attribute]
-pub fn regexes_static(_attr: TokenStream, item: TokenStream) -> TokenStream {
-    TokenStream::from(regexes_static_gen(parse_macro_input!(item as ItemMod)))
+
+/// 错误信息池懒加载预编译派生宏 [属性宏](https://doc.rust-lang.org/stable/proc_macro/index.html)
+#[proc_macro_derive(Error, attributes(e))]
+pub fn error_derive(input: TokenStream) -> TokenStream {
+    error::entry::error_derive(input)
+}
+
+/// 正则规则池懒加载预编译派生宏 [属性宏](https://doc.rust-lang.org/stable/proc_macro/index.html)
+#[proc_macro_derive(RegexPool, attributes(regex))]
+pub fn regex_pool_derive(input: TokenStream) -> TokenStream {
+    regex_pool::entry::regex_pool_derive(input)
 }
