@@ -12,7 +12,6 @@ struct RunErrDef {
     error_test_3: (),
 }
 
-#[macro_use]
 macro_rules! run_err {
     () => {
         &RUNERR

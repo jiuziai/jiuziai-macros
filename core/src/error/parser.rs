@@ -1,5 +1,4 @@
 use crate::error::types::FieldInfo;
-use syn::Path;
 
 pub fn parse_fields(ast: &syn::DeriveInput) -> Result<Vec<FieldInfo>, proc_macro2::TokenStream> {
     let mut res = Vec::new();

@@ -86,7 +86,7 @@ impl E {
         Self {
             code: self.code,
             desc: self.desc,
-            template: self.template.clone(),
+            template: self.template,
             args: {
                 let mut new_args = self.args.clone();
                 new_args.push(arg.to_string());

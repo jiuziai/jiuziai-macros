@@ -4,12 +4,11 @@ use quote::quote;
 use syn::DeriveInput;
 
 pub fn derive_validate_entry(input: DeriveInput) -> TokenStream {
-    let struct_info = match parse_struct(&input) {
+    let check_list = match parse_struct(&input) {
         Ok(val) => val,
         Err(e) => return e.to_compile_error(),
     };
 
-    eprintln!("Struct info: {:?}", struct_info);
 
     quote! {
         impl ValidateTrait for SimpleUser{
