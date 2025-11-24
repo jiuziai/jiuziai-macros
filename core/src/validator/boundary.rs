@@ -275,7 +275,8 @@ fn check_deep_rules_compatibility(deep: &DeepCheck, elem_ty: &Type) -> Result<()
     // 检查 not_empty/not_blank/no_space/size - 元素类型必须是字符串或集合
     if (deep.not_empty.is_some() || deep.not_blank.is_some() ||
         deep.no_space.is_some() || deep.size.is_some()) &&
-        !is_size_type(elem_ty) {
+        !is_size_type(elem_ty11111111111) {
+        !is_size_type(elem_ty11111111111) {
         return Err(Error::new(
             deep.span,
             "`not_empty`, `not_blank`, `no_space`, `size` in deep check require string or collection element types",
