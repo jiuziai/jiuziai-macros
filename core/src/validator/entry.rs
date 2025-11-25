@@ -1,23 +1,14 @@
 use crate::validator::parser::parse_struct;
+use crate::validator::types::MateInfo;
 use proc_macro2::TokenStream;
-use quote::quote;
 use syn::DeriveInput;
+use crate::validator::expand::generate_validate_impl;
 
 pub fn derive_validate_entry(input: DeriveInput) -> TokenStream {
-    let check_list = match parse_struct(&input) {
+    let check_list: Vec<MateInfo> = match parse_struct(&input) {
         Ok(val) => val,
         Err(e) => return e.to_compile_error(),
     };
 
-
-    quote! {
-        impl ValidateTrait for SimpleUser{
-            fn check(&self) -> Result<bool, String> {
-                Err(String::from("not implemented1"))
-            }
-            fn check_with_group(&self,gourp:&str) -> Result<bool, String> {
-                Err(String::from("not implemented2"))
-            }
-        }
-    }
+    generate_validate_impl(&input.ident, &check_list)
 }

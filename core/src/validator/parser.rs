@@ -3,12 +3,12 @@ use crate::validator::types::*;
 use quote::ToTokens;
 use std::collections::HashSet;
 use syn::{
-    punctuated::Punctuated, spanned::Spanned, Data, DataStruct, DeriveInput, Error, Expr, Field, Fields, Lit, Meta,
-    MetaNameValue, Result, Token,
+    punctuated::Punctuated, spanned::Spanned, Data, DataStruct, DeriveInput, Error, Expr, ExprPath, Field, Fields, Lit,
+    Meta, MetaNameValue, Result, Token,
 };
 
 /// 解析整个 struct 输入，返回所有带 check 的字段（FieldInfo 列表）
-pub fn parse_struct(input: &DeriveInput) -> Result<Vec<FieldInfo>> {
+pub fn parse_struct(input: &DeriveInput) -> Result<Vec<MateInfo>> {
     let mut results = Vec::new();
     match &input.data {
         Data::Struct(DataStruct {
@@ -34,19 +34,20 @@ pub fn parse_struct(input: &DeriveInput) -> Result<Vec<FieldInfo>> {
 }
 
 /// 解析一个 struct 字段上的 FieldInfo
-pub fn parse_field(field: &Field) -> Result<FieldInfo> {
+pub fn parse_field(field: &Field) -> Result<MateInfo> {
     let name = field
         .ident
         .clone()
         .ok_or_else(|| Error::new(field.span(), "Field must have ident"))?;
     let ty = field.ty.clone();
-    let mut info = FieldInfo::new(name, ty, field.span());
+    let inner_ty = is_option_type(&ty).then(|| strip_option(&ty));
+    let mut info = MateInfo::new(name, ty, inner_ty, field.span());
     for attr in &field.attrs {
         if attr.path().is_ident("check") {
             let metas: Punctuated<Meta, Token![,]> =
                 attr.parse_args_with(Punctuated::<Meta, Token![,]>::parse_terminated)?;
             for meta in &metas {
-                parse_check_meta(meta, &mut info)?;
+                parse_check_meta(meta, &mut info, 0)?;
             }
         }
     }
@@ -54,14 +55,26 @@ pub fn parse_field(field: &Field) -> Result<FieldInfo> {
 }
 
 /// 递归解析 #[check(...)] 每个 Meta
-pub fn parse_check_meta(meta: &Meta, info: &mut FieldInfo) -> Result<()> {
+pub fn parse_check_meta(meta: &Meta, info: &mut MateInfo, deep: u8) -> Result<()> {
     match meta {
         Meta::Path(path) => {
             if let Some(ident) = path.get_ident() {
                 if ident == "deep" {
-                    // 将 Meta::Path 转换为空的 Meta::List 来处理
-                    let empty_args = Punctuated::<Meta, Token![,]>::new();
-                    parse_deep_check(info, &empty_args)?;
+                    if deep > 0 {
+                        return Err(Error::new(
+                            path.span(),
+                            "Does not allow deeper depth verification",
+                        ));
+                    }
+                    if info.deep.is_some() {
+                        return Err(Error::new(path.span(), "`deep` attribute already exists"));
+                    }
+                    info.deep = Some(Box::from(MateInfo::new(
+                        info.name.clone(),
+                        info.ty.clone(),
+                        info.option_ty.clone(),
+                        path.span(),
+                    )))
                 } else {
                     return Err(Error::new(
                         path.span(),
@@ -125,8 +138,54 @@ pub fn parse_check_meta(meta: &Meta, info: &mut FieldInfo) -> Result<()> {
                 "out_of" => parse_out_of_check(info, &args)?,
                 "regex" => parse_regex_check(info, &args)?,
                 "func" => parse_func_check(info, &args)?,
-                "group" => parse_group_check(info, &args)?,
-                "deep" => parse_deep_check(info, &args)?,
+                "group" => {
+                    if deep > 0 {
+                        return Err(Error::new(
+                            group_name.span(),
+                            "Deep validation does not allow the use of `group`",
+                        ));
+                    }
+                    parse_group_check(info, &args)
+                }?,
+                "deep" => {
+                    if deep > 1 {
+                        return Err(Error::new(
+                            group_name.span(),
+                            "Does not allow deeper depth verification",
+                        ));
+                    }
+
+                    // 创建 deep 信息
+                    let mut deep_info = MateInfo::new(
+                        info.name.clone(),
+                        info.ty.clone(),
+                        info.option_ty.clone(),
+                        group_name.span(),
+                    );
+
+                    if is_collection(&deep_info.ty) {
+                        if let Some(elem_ty) = get_collection_element_type(&info.ty) {
+                            deep_info.ty = elem_ty.clone();
+                            if is_option_type(&deep_info.ty) {
+                                deep_info.option_ty = Some(strip_option(&deep_info.ty));
+                            } else {
+                                deep_info.option_ty = None
+                            }
+                        }else {
+                            return Err(Error::new(
+                                group_name.span(),
+                                "Failed to parse collection element type",
+                            ));
+                        }
+                    }
+
+                    // 遍历 args 中的每个 meta，分别解析
+                    for meta in &args {
+                        parse_check_meta(meta, &mut deep_info, deep + 1)?;
+                    }
+
+                    info.deep = Some(Box::new(deep_info));
+                }
                 _ => {
                     return Err(Error::new(
                         group_name.span(),
@@ -141,10 +200,7 @@ pub fn parse_check_meta(meta: &Meta, info: &mut FieldInfo) -> Result<()> {
 
 // RequiredCheck
 
-pub fn parse_required_check(
-    info: &mut FieldInfo,
-    args: &Punctuated<Meta, Token![,]>,
-) -> Result<()> {
+pub fn parse_required_check(info: &mut MateInfo, args: &Punctuated<Meta, Token![,]>) -> Result<()> {
     exists_check(&info.required, args.span(), "required")?;
     info.required = Some(parse_bool(args)?);
     Ok(())
@@ -152,7 +208,7 @@ pub fn parse_required_check(
 // RequiredCheck
 
 pub fn parse_not_empty_check(
-    info: &mut FieldInfo,
+    info: &mut MateInfo,
     args: &Punctuated<Meta, Token![,]>,
 ) -> Result<()> {
     exists_check(&info.not_empty, args.span(), "not_empty")?;
@@ -163,7 +219,7 @@ pub fn parse_not_empty_check(
 // RequiredCheck
 
 pub fn parse_not_blank_check(
-    info: &mut FieldInfo,
+    info: &mut MateInfo,
     args: &Punctuated<Meta, Token![,]>,
 ) -> Result<()> {
     exists_check(&info.not_blank, args.span(), "not_blank")?;
@@ -173,42 +229,39 @@ pub fn parse_not_blank_check(
 
 // RequiredCheck
 
-pub fn parse_no_space_check(
-    info: &mut FieldInfo,
-    args: &Punctuated<Meta, Token![,]>,
-) -> Result<()> {
+pub fn parse_no_space_check(info: &mut MateInfo, args: &Punctuated<Meta, Token![,]>) -> Result<()> {
     exists_check(&info.no_space, args.span(), "no_space")?;
     info.no_space = Some(parse_bool(args)?);
     Ok(())
 }
 
 // SizeCheck
-pub fn parse_size_check(info: &mut FieldInfo, args: &Punctuated<Meta, Token![,]>) -> Result<()> {
+pub fn parse_size_check(info: &mut MateInfo, args: &Punctuated<Meta, Token![,]>) -> Result<()> {
     exists_check(&info.size, args.span(), "size")?;
     info.size = Some(parse_min_max(args)?);
     Ok(())
 }
 // RangeCheck
-pub fn parse_range_check(info: &mut FieldInfo, args: &Punctuated<Meta, Token![,]>) -> Result<()> {
+pub fn parse_range_check(info: &mut MateInfo, args: &Punctuated<Meta, Token![,]>) -> Result<()> {
     exists_check(&info.range, args.span(), "range")?;
     info.range = Some(parse_min_max(args)?);
     Ok(())
 }
 // WithinCheck
-pub fn parse_within_check(info: &mut FieldInfo, args: &Punctuated<Meta, Token![,]>) -> Result<()> {
+pub fn parse_within_check(info: &mut MateInfo, args: &Punctuated<Meta, Token![,]>) -> Result<()> {
     exists_check(&info.within, args.span(), "within")?;
     info.within = Some(parse_values(args)?);
     Ok(())
 }
 // WithOutCheck
-pub fn parse_out_of_check(info: &mut FieldInfo, args: &Punctuated<Meta, Token![,]>) -> Result<()> {
+pub fn parse_out_of_check(info: &mut MateInfo, args: &Punctuated<Meta, Token![,]>) -> Result<()> {
     exists_check(&info.out_of, args.span(), "out_of")?;
     info.out_of = Some(parse_values(args)?);
     Ok(())
 }
 
 // RegexCheck
-pub fn parse_regex_check(info: &mut FieldInfo, args: &Punctuated<Meta, Token![,]>) -> Result<()> {
+pub fn parse_regex_check(info: &mut MateInfo, args: &Punctuated<Meta, Token![,]>) -> Result<()> {
     exists_check(&info.regex, args.span(), "regex")?;
 
     let mut refer: Option<Expr> = None; // 改为 Expr 类型
@@ -274,7 +327,7 @@ pub fn parse_regex_check(info: &mut FieldInfo, args: &Punctuated<Meta, Token![,]
 }
 
 // FuncCheck
-pub fn parse_func_check(info: &mut FieldInfo, args: &Punctuated<Meta, Token![,]>) -> Result<()> {
+pub fn parse_func_check(info: &mut MateInfo, args: &Punctuated<Meta, Token![,]>) -> Result<()> {
     exists_check(&info.func, args.span(), "func")?;
 
     let mut handler: Option<Expr> = None;
@@ -312,24 +365,29 @@ pub fn parse_func_check(info: &mut FieldInfo, args: &Punctuated<Meta, Token![,]>
 
     Ok(())
 }
-
 // GroupCheck
-pub fn parse_group_check(info: &mut FieldInfo, args: &Punctuated<Meta, Token![,]>) -> Result<()> {
+pub fn parse_group_check(info: &mut MateInfo, args: &Punctuated<Meta, Token![,]>) -> Result<()> {
     if info.group.is_some() {
         return Err(Error::new(args.span(), "`group` attribute already exists"));
     }
 
-    let mut groups: Vec<syn::Path> = Vec::new();
+    let mut groups: Vec<Expr> = Vec::new();
 
     for meta in args {
         match meta {
             Meta::Path(path) => {
-                groups.push(path.clone());
+                // 将 Path 转为 ExprPath
+                let expr = Expr::Path(ExprPath {
+                    attrs: Vec::new(),
+                    qself: None,
+                    path: path.clone(),
+                });
+                groups.push(expr);
             }
             _ => {
                 return Err(Error::new(
                     meta.span(),
-                    "`group` must contain only path expressions",
+                    "`group` only allows path expressions like MyEnum::A",
                 ));
             }
         }
@@ -341,11 +399,11 @@ pub fn parse_group_check(info: &mut FieldInfo, args: &Punctuated<Meta, Token![,]
 
     // 检查重复
     let mut seen = HashSet::new();
-    for path in &groups {
-        let key = path.to_token_stream().to_string();
+    for expr in &groups {
+        let key = expr.to_token_stream().to_string();
         if !seen.insert(key.clone()) {
             return Err(Error::new(
-                path.span(),
+                expr.span(),
                 format!("duplicate group \"{}\" found", key),
             ));
         }
@@ -354,154 +412,6 @@ pub fn parse_group_check(info: &mut FieldInfo, args: &Punctuated<Meta, Token![,]
     info.group = Some(groups);
     Ok(())
 }
-
-pub fn parse_deep_check(info: &mut FieldInfo, args: &Punctuated<Meta, Token![,]>) -> Result<()> {
-    exists_check(&info.deep, args.span(), "deep")?;
-
-    let check_ty = info.inner_ty.as_ref().unwrap_or(&info.ty);
-    let is_collection = is_collection(check_ty);
-
-    if !is_collection && !args.is_empty() {
-        return Err(Error::new(
-            args.span(),
-            "`deep` with validation rules is only allowed on collection types",
-        ));
-    }
-
-    let (ty, inner_ty) = if is_collection {
-        let elem_ty = get_collection_element_type(check_ty).unwrap_or(check_ty);
-        (check_ty.clone(), Some(elem_ty.clone()))
-    } else {
-        (check_ty.clone(), None)
-    };
-
-    let mut deep_info = FieldInfo {
-        name: info.name.clone(),
-        ty: ty.clone(),
-        inner_ty: inner_ty.clone(),
-        required: None,
-        not_empty: None,
-        not_blank: None,
-        no_space: None,
-        size: None,
-        range: None,
-        within: None,
-        out_of: None,
-        regex: None,
-        func: None,
-        deep: None,
-        message: None,
-        group: None,
-        span: args.span(),
-    };
-
-    // 专门解析 deep 内部的验证规则（不允许 deep 和 group）
-    if is_collection {
-        for meta in args {
-            parse_deep_inner_meta(meta, &mut deep_info)?;
-        }
-    }
-
-    info.deep = Some(DeepCheck {
-        ty,
-        inner_ty,
-        required: deep_info.required,
-        not_empty: deep_info.not_empty,
-        not_blank: deep_info.not_blank,
-        no_space: deep_info.no_space,
-        size: deep_info.size,
-        range: deep_info.range,
-        within: deep_info.within,
-        out_of: deep_info.out_of,
-        regex: deep_info.regex,
-        func: deep_info.func,
-        message: deep_info.message,
-        span: args.span(),
-    });
-
-    Ok(())
-}
-
-/// 专门解析 deep 内部的验证规则
-fn parse_deep_inner_meta(meta: &Meta, info: &mut FieldInfo) -> Result<()> {
-    match meta {
-        Meta::Path(path) => {
-            if let Some(ident) = path.get_ident() {
-                if ident == "deep" {
-                    return Err(Error::new(path.span(), "Nested `deep` is not allowed"));
-                } else {
-                    return Err(Error::new(
-                        path.span(),
-                        format!("Unknown unary check in deep: {}", ident),
-                    ));
-                }
-            }
-            return Err(Error::new(path.span(), "Expected identifier in Meta::Path"));
-        }
-        Meta::NameValue(nv) => {
-            let ident = nv
-                .path
-                .get_ident()
-                .ok_or_else(|| Error::new(nv.path.span(), "Expected identifier"))?;
-            if ident == "message" {
-                if let Expr::Lit(expr_lit) = &nv.value {
-                    if let Lit::Str(s) = &expr_lit.lit {
-                        if info.message.is_some() {
-                            return Err(Error::new(nv.span(), "`message` attribute already exists"));
-                        }
-                        info.message = Some(s.value());
-                    } else {
-                        return Err(Error::new(
-                            expr_lit.lit.span(),
-                            "message must be a string literal",
-                        ));
-                    }
-                } else {
-                    return Err(Error::new(
-                        nv.value.span(),
-                        "message must be a string literal",
-                    ));
-                }
-            } else {
-                return Err(Error::new(
-                    nv.path.span(),
-                    format!("Unknown name-value check in deep: {}", ident),
-                ));
-            }
-        }
-        Meta::List(list) => {
-            let group_name = list
-                .path
-                .get_ident()
-                .ok_or_else(|| Error::new(list.path.span(), "Expected identifier"))?;
-            let args: Punctuated<Meta, Token![,]> =
-                list.parse_args_with(Punctuated::<Meta, Token![,]>::parse_terminated)?;
-
-            match group_name.to_string().as_str() {
-                "required" => parse_required_check(info, &args)?,
-                "not_empty" => parse_not_empty_check(info, &args)?,
-                "not_blank" => parse_not_blank_check(info, &args)?,
-                "no_space" => parse_no_space_check(info, &args)?,
-                "size" | "len" => parse_size_check(info, &args)?,
-                "range" => parse_range_check(info, &args)?,
-                "within" => parse_within_check(info, &args)?,
-                "out_of" => parse_out_of_check(info, &args)?,
-                "regex" => parse_regex_check(info, &args)?,
-                "func" => parse_func_check(info, &args)?,
-                "group" => return Err(Error::new(list.span(), "`group` is not allowed in deep")),
-                "deep" => return Err(Error::new(list.span(), "Nested `deep` is not allowed")),
-                _ => {
-                    return Err(Error::new(
-                        group_name.span(),
-                        format!("Unknown check group in deep: {}", group_name),
-                    ));
-                }
-            }
-        }
-    }
-    Ok(())
-}
-
 // 解析 Values 类型
 pub fn parse_bool(args: &Punctuated<Meta, Token![,]>) -> Result<BoolCheck> {
     let mut message = None;

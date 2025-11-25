@@ -1,11 +1,12 @@
 use proc_macro2::{Ident, Span};
-use syn::{Expr, Path, Type};
+use syn::{Expr, Type};
 
 #[derive(Debug, Clone)]
-pub struct FieldInfo {
+pub struct MateInfo {
     pub name: Ident,
     pub ty: Type,
-    pub inner_ty: Option<Type>,
+    pub option_ty: Option<Type>,
+    pub span: Span,
 
     pub required: Option<BoolCheck>,
     pub not_empty: Option<BoolCheck>,
@@ -18,20 +19,20 @@ pub struct FieldInfo {
     pub regex: Option<RegexCheck>,
     pub func: Option<FuncCheck>,
 
-    pub deep: Option<DeepCheck>,
+    pub deep: Option<Box<MateInfo>>,
     pub message: Option<String>,
-    pub group: Option<Vec<Path>>,
-    pub span: Span,
+    pub group: Option<Vec<Expr>>,
 }
-
-impl FieldInfo {
-    pub fn new(name: Ident, ty: Type, span: Span) -> Self {
+impl MateInfo {
+    pub fn new(name: Ident, ty: Type, option_ty: Option<Type>, span: Span) -> Self {
         Self {
             name,
             ty,
-            inner_ty: None,
-            required: None,
-            not_empty: None,
+            option_ty,
+            span,
+            
+            required:None,
+            not_empty:None,
             not_blank: None,
             no_space: None,
             size: None,
@@ -43,28 +44,8 @@ impl FieldInfo {
             deep: None,
             message: None,
             group: None,
-            span,
         }
     }
-}
-#[derive(Debug, Clone)]
-pub struct DeepCheck {
-    pub ty: Type,
-    pub inner_ty: Option<Type>,
-
-    pub required: Option<BoolCheck>,
-    pub not_empty: Option<BoolCheck>,
-    pub not_blank: Option<BoolCheck>,
-    pub no_space: Option<BoolCheck>,
-    pub size: Option<MinMaxCheck>,
-    pub range: Option<MinMaxCheck>,
-    pub within: Option<ValuesCheck>,
-    pub out_of: Option<ValuesCheck>,
-    pub regex: Option<RegexCheck>,
-    pub func: Option<FuncCheck>,
-
-    pub message: Option<String>,
-    pub span: Span,
 }
 #[derive(Debug, Clone)]
 pub struct BoolCheck {
