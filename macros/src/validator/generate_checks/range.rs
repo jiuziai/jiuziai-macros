@@ -5,7 +5,7 @@ use crate::validator::types::MetaInfo;
 use proc_macro2::{Ident, TokenStream};
 use quote::quote;
 
-pub fn generate_range_check(info: &MetaInfo, label_identifier: &Ident) -> TokenStream {
+pub fn generate_range_check(info: &MetaInfo, is_coll:bool,label_identifier: &Ident) -> TokenStream {
     let range = match &info.range {
         Some(r) => r,
         None => return quote! {},

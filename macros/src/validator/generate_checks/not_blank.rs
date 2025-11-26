@@ -7,7 +7,7 @@ use proc_macro2::{Ident, TokenStream};
 use quote::quote;
 use syn::Error;
 
-pub fn generate_not_blank_check(info: &MetaInfo, label_identifier: &Ident) -> TokenStream {
+pub fn generate_not_blank_check(info: &MetaInfo,is_coll:bool, label_identifier: &Ident) -> TokenStream {
     let not_blank = match &info.not_blank {
         Some(ne) => ne,
         None => return quote! {},

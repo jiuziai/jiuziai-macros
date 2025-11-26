@@ -6,7 +6,7 @@ use proc_macro2::{Ident, TokenStream};
 use quote::quote;
 
 // 在 not_empty.rs 中
-pub fn generate_not_empty_check(info: &MetaInfo, label_identifier: &Ident) -> TokenStream {
+pub fn generate_not_empty_check(info: &MetaInfo, is_coll:bool,label_identifier: &Ident) -> TokenStream {
     let not_empty = match &info.not_empty {
         Some(ne) => ne,
         None => return quote! {},

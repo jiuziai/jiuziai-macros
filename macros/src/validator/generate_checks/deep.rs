@@ -1,10 +1,14 @@
-use crate::validator::boundary::{is_collection, strip_option};
+use crate::validator::boundary::is_collection;
 use crate::validator::generate_checks::generate_single_field;
 use crate::validator::types::MetaInfo;
 use proc_macro2::TokenStream;
 use quote::quote;
 
-pub fn generate_deep_check(info: &MetaInfo, group: Option<&syn::Expr>, deep: u8) -> TokenStream {
+pub fn generate_deep_check(
+    info: &MetaInfo,
+    group: Option<&syn::Expr>,
+    deep: u8,
+) -> TokenStream {
     let deep_info = match &info.deep {
         Some(d) => d,
         None => return quote! {},
@@ -27,7 +31,6 @@ pub fn generate_deep_check(info: &MetaInfo, group: Option<&syn::Expr>, deep: u8)
         } else {
             trait_check = quote! {};
         }
-
 
         quote! {
             if let Some(inner_values) = &self.#name {

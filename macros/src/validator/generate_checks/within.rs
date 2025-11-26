@@ -6,7 +6,7 @@ use crate::validator::types::MetaInfo;
 use proc_macro2::{Ident, TokenStream};
 use quote::quote;
 
-pub fn generate_within_check(info: &MetaInfo, label_identifier: &Ident) -> TokenStream {
+pub fn generate_within_check(info: &MetaInfo,is_coll:bool, label_identifier: &Ident) -> TokenStream {
     let within = match &info.within {
         Some(r) => r,
         None => return quote! {},

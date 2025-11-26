@@ -1,12 +1,12 @@
+use crate::validator::boundary::{is_collection, is_string_collection, is_string_type};
 use crate::validator::generate_checks::{
     generate_option_condition, generate_validation_code, get_validation_message,
 };
 use crate::validator::types::MetaInfo;
 use proc_macro2::{Ident, TokenStream};
 use quote::quote;
-use crate::validator::boundary::{is_collection, is_string_collection, is_string_type, strip_option};
 
-pub fn generate_out_of_check(info: &MetaInfo, label_identifier: &Ident) -> TokenStream {
+pub fn generate_out_of_check(info: &MetaInfo,is_coll:bool, label_identifier: &Ident) -> TokenStream {
     let out_of = match &info.out_of {
         Some(r) => r,
         None => return quote! {},

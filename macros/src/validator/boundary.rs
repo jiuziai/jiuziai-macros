@@ -214,7 +214,8 @@ pub fn is_collection(ty: &Type) -> bool {
     if let Type::Path(TypePath { path, .. }) = ty {
         if let Some(seg) = path.segments.last() {
             match seg.ident.to_string().as_str() {
-                "Vec" | "HashMap" | "BTreeMap" | "BTreeSet" => true,
+                "Vec" | "VecDeque" | "LinkedList" | "HashSet" | "BTreeSet" | "HashMap"
+                | "BTreeMap" | "SmallVec" | "IndexMap" => true,
                 _ => false,
             }
         } else {
@@ -224,6 +225,25 @@ pub fn is_collection(ty: &Type) -> bool {
         false
     }
 }
+
+/// 判断类型是不是Map（给定的集合类型）
+/// Option<T> 只看 T
+pub fn is_map(ty: &Type) -> bool {
+    let ty = strip_option(ty); // 如果顶层是Option，则只看Option内的类型
+    if let Type::Path(TypePath { path, .. }) = ty {
+        if let Some(seg) = path.segments.last() {
+            match seg.ident.to_string().as_str() {
+                "HashMap" | "BTreeMap" | "IndexMap" => true,
+                _ => false,
+            }
+        } else {
+            false
+        }
+    } else {
+        false
+    }
+}
+
 /// 是否是字符串集合
 pub fn is_string_collection(ty: &syn::Type) -> bool {
     // 检查是否是 Vec<String>, Vec<&str>, HashSet<String> 等
@@ -308,7 +328,6 @@ pub fn is_option_type(ty: &Type) -> bool {
         false
     }
 }
-
 
 /// 检查是否有任何验证规则
 pub fn has_any_validation_rules(info: &MetaInfo) -> bool {

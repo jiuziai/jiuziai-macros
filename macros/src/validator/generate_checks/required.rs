@@ -5,7 +5,7 @@ use proc_macro2::TokenStream;
 use quote::quote;
 
 /// required 不参与 any/all 模式区分
-pub fn generate_required_check(info: &MetaInfo, label_identifier: &Ident) -> TokenStream {
+pub fn generate_required_check(info: &MetaInfo, is_coll: bool, label_identifier: &Ident) -> TokenStream {
     let required = match &info.required {
         Some(r) => r,
         None => return quote! {},

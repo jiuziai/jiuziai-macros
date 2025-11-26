@@ -1,3 +1,4 @@
+use crate::validator::boundary::{is_collection, is_map};
 use crate::validator::generate_checks::deep::generate_deep_check;
 use crate::validator::generate_checks::func::generate_func_check;
 use crate::validator::generate_checks::no_space::generate_no_space_check;
@@ -71,46 +72,104 @@ pub fn generate_validation_code(
 /// generate_option_condition(&info, |var| quote! { #var.is_empty() })
 pub fn generate_option_condition(
     info: &MetaInfo,
+    is_coll: bool, // 新增参数，根据生成校验时场景传 true/false
     condition_fn: impl Fn(TokenStream) -> TokenStream,
 ) -> (TokenStream, TokenStream) {
     let name = &info.name;
-
-    if info.option_ty.is_some() {
-        let inner_condition = condition_fn(quote! { inner });
-        let any_cond = quote! {
-            self.#name.as_ref().map_or(false, |inner| #inner_condition)
-        };
-        let all_cond = quote! {
-            self.#name.as_ref().map_or(true, |inner| !(#inner_condition))
-        };
-        (any_cond, all_cond)
+    if is_coll && is_collection(&info.ty) {
+        if is_map(&info.ty) {
+            if info.option_ty.is_some() {
+                // Option<Map>
+                let inner_condition = condition_fn(quote! { key, value });
+                let any_cond = quote! {
+                    self.#name.as_ref()
+                        .map_or(false, |map| map.iter().any(|(key, value)| #inner_condition))
+                };
+                let all_cond = quote! {
+                    self.#name.as_ref()
+                        .map_or(true, |map| map.iter().all(|(key, value)| #inner_condition))
+                };
+                (any_cond, all_cond)
+            } else {
+                // Map 本身
+                let self_condition = condition_fn(quote! { key, value });
+                let any_cond = quote! {
+                    self.#name.iter().any(|(key, value)| #self_condition)
+                };
+                let all_cond = quote! {
+                    self.#name.iter().all(|(key, value)| #self_condition)
+                };
+                (any_cond, all_cond)
+            }
+        } else {
+            if info.option_ty.is_some() {
+                // Option<Collection>
+                let inner_condition = condition_fn(quote! { value });
+                let any_cond = quote! {
+                    self.#name.as_ref()
+                        .map_or(false, |coll| coll.iter().any(|value| #inner_condition))
+                };
+                let all_cond = quote! {
+                    self.#name.as_ref()
+                        .map_or(true, |coll| coll.iter().all(|value| #inner_condition))
+                };
+                (any_cond, all_cond)
+            } else {
+                // 普通集合本身
+                let self_condition = condition_fn(quote! { value });
+                let any_cond = quote! {
+                    self.#name.iter().any(|value| #self_condition)
+                };
+                let all_cond = quote! {
+                    self.#name.iter().all(|value| #self_condition)
+                };
+                (any_cond, all_cond)
+            }
+        }
     } else {
-        let self_condition = condition_fn(quote! { self.#name });
-        let any_cond = quote! { #self_condition };
-        let all_cond = quote! { !(#self_condition) };
-        (any_cond, all_cond)
+        if info.option_ty.is_some() {
+            // Option<T>
+            let inner_condition = condition_fn(quote! { inner });
+            let any_cond = quote! {
+                self.#name.as_ref().map_or(false, |inner| #inner_condition)
+            };
+            let all_cond = quote! {
+                self.#name.as_ref().map_or(true, |inner| !(#inner_condition))
+            };
+            (any_cond, all_cond)
+        } else {
+            // 普通字段
+            let self_condition = condition_fn(quote! { self.#name });
+            let any_cond = quote! { #self_condition };
+            let all_cond = quote! { !(#self_condition) };
+            (any_cond, all_cond)
+        }
     }
 }
 
 // 生成单个字段的完整验证
-pub fn generate_single_field(info: &MetaInfo, group: Option<&syn::Expr>, deep: u8) -> TokenStream {
+pub fn generate_single_field(
+    info: &MetaInfo,
+    group: Option<&syn::Expr>,
+    is_coll: bool,
+    deep: u8,
+) -> TokenStream {
     let label_identifier = syn::Ident::new(
         &format!("{}_validation_deep_{}", info.name, deep),
         info.span,
     );
 
     let mut checks = TokenStream::new();
-    checks.extend(generate_required_check(info, &label_identifier));
-    checks.extend(generate_not_empty_check(info, &label_identifier));
-    checks.extend(generate_not_blank_check(info, &label_identifier));
-    checks.extend(generate_no_space_check(info, &label_identifier));
-    checks.extend(generate_size_check(info, &label_identifier));
-    checks.extend(generate_range_check(info, &label_identifier));
-    checks.extend(generate_within_check(info, &label_identifier));
-    checks.extend(generate_out_of_check(info, &label_identifier));
-    checks.extend(generate_regex_check(info, &label_identifier));
-    checks.extend(generate_func_check(info, &label_identifier));
-    checks.extend(generate_func_check(info, &label_identifier));
+    checks.extend(generate_required_check(info, is_coll, &label_identifier));
+    checks.extend(generate_not_empty_check(info, is_coll, &label_identifier));
+    checks.extend(generate_not_blank_check(info, is_coll, &label_identifier));
+    checks.extend(generate_no_space_check(info, is_coll, &label_identifier));
+    checks.extend(generate_size_check(info, is_coll, &label_identifier));
+    checks.extend(generate_range_check(info, is_coll, &label_identifier));
+    checks.extend(generate_within_check(info, is_coll, &label_identifier));
+    checks.extend(generate_out_of_check(info, is_coll, &label_identifier));
+    checks.extend(generate_regex_check(info, is_coll, &label_identifier));
+    checks.extend(generate_func_check(info, is_coll, &label_identifier));
     checks.extend(generate_deep_check(info, group, deep + 1));
 
     if info.message.is_some() {
