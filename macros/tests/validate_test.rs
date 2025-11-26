@@ -1,27 +1,28 @@
 #[cfg(test)]
 mod tests {
-    use jiuziai_macro_core::Validator;
-    use jiuziai_macro_libs::validate::types::Validate;
+    use jiuziai_macros::{RegexPool, Validator};
+    use jiuziai_libs::validate::types::Validate;
 
     // 测试用的自定义验证函数
     fn custom_validate_email(email: &str) -> bool {
         email.contains('@')
     }
 
-    fn custom_validate_age(age: &u32) -> bool {
-        *age >= 18 && *age <= 100
+    // 测试用的Regex引用
+    #[allow(dead_code)]
+    #[derive(RegexPool)]
+    struct RegexPoolTestDef {
+        #[regex(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$")]
+        email: (),
+        #[regex(r"^1[3-9]\d{9}$")]
+        phone: (),
     }
-
-    // 测试用的正则常量
-    const EMAIL_REGEX: &str = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$";
-    const PHONE_REGEX: &str = r"^1[3-9]\d{9}$";
 
     // 测试用的枚举分组
     #[derive(PartialEq, Debug)]
     enum UserGroup {
         Admin,
         User,
-        Guest,
     }
 
     // 嵌套的验证结构
@@ -30,9 +31,7 @@ mod tests {
         #[check(required(message = "邮箱必填"))]
         email: Option<String>,
 
-        #[check(
-            range(min = 18, max = 100, message = "年龄必须在18-100之间")
-        )]
+        #[check(range(min = 18, max = 100, message = "年龄必须在18-100之间"))]
         age: u32,
     }
 
@@ -40,12 +39,7 @@ mod tests {
     #[derive(Validator)]
     struct TestUser {
         // any 模式测试
-        #[check(
-            required(message = "用户名必填"),
-            not_empty(message = "用户名不能为空"),
-            size(min = 3, max = 20, message = "用户名长度3-20"),
-            message = "用户名验证失败"  // any 模式
-        )]
+        #[check(required, not_empty, size(min = 3, max = 20), message = "必填或者")]
         username: Option<String>,
 
         // all 模式测试
@@ -54,14 +48,13 @@ mod tests {
             not_blank(message = "密码不能全是空白字符"),
             no_space(message = "密码不能包含空格"),
             size(min = 6, message = "密码至少6位")
-            // 没有 message，所以是 all 模式
         )]
         password: Option<String>,
 
         // 正则测试
         #[check(
             required(message = "邮箱必填"),
-            regex(refer(EMAIL_REGEX), message = "邮箱格式错误")
+            regex(refer(REGEX_POOL_TEST.email), message = "邮箱格式错误")
         )]
         email: Option<String>,
 
@@ -125,11 +118,8 @@ mod tests {
         assert!(valid_user.check().is_ok());
 
         // 测试分组验证
-        assert!(valid_user.check_with_group(UserGroup::Admin).is_ok());
-        assert!(valid_user.check_with_group(UserGroup::User).is_ok());
-
-        // 测试未知分组（应该编译报错）
-        // valid_user.check_with_group(UserGroup::Guest); // 应该编译错误
+        assert!(valid_user.check_with_group(&UserGroup::Admin).is_ok());
+        assert!(valid_user.check_with_group(&UserGroup::User).is_ok());
 
         // 测试无效数据
         let invalid_user = TestUser {

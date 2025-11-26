@@ -4,5 +4,5 @@ pub trait Validate {
     fn check(&self) -> Result<bool, String>;
 
     /// Validate fields with specific group
-    fn check_with_group(&self, group: impl PartialEq) -> Result<bool, String>;
+    fn check_with_group(&self, group: &dyn std::any::Any) -> Result<bool, String>;
 }

@@ -2,7 +2,7 @@
 resolver = "3"
 members = [
     "libs",
-    "core"
+    "macros",
 ]
 
 [workspace.dependencies]
@@ -21,12 +21,15 @@ rust_decimal = "1.39.0"
 chrono = "0.4.42"
 rust_decimal_macros = "1.39.0"
 lazy_static = "1.5.0"
-jiuziai-macro-libs = { path = "libs" }
-jiuziai-macro-core = { path = "core" }
+redis = { version = "1.0.0-rc.3", features = ["tokio-comp", "connection-manager"] }
+deadpool-redis = "0.22.0"
+sqlx = { version = "0.9.0-alpha.1", features = ["postgres", "runtime-tokio", "tls-rustls", "uuid", "chrono"] }
+jiuziai-libs = { path = "libs" }
+jiuziai-macros = { path = "macros" }
 
 [patch.crates-io]
 # During local development, override the registry version with the local path
-jiuziai-macro-libs = { path = "libs" }
+jiuziai-libs = { path = "libs" }
 
 
 [profile.release]

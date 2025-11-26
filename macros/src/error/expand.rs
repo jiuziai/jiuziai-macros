@@ -2,7 +2,7 @@ use crate::error::types::FieldInfo;
 use quote::{format_ident, quote};
 
 /// 必须用你的外部E类型路径
-const E_PATH: &str = "jiuziai_macro_libs::types::e::E";
+const E_PATH: &str = "jiuziai_libs::types::e::E";
 
 pub fn expand_error_pool(base_name: &str, fields: &[FieldInfo]) -> proc_macro2::TokenStream {
     let struct_ident = format_ident!("{}", base_name);
@@ -25,7 +25,7 @@ pub fn expand_error_pool(base_name: &str, fields: &[FieldInfo]) -> proc_macro2::
         let desc_clean = desc.replace(r"\{", "{").replace(r"\}", "}");
         let template_vec: Vec<&str> = desc_clean.split("{}").collect();
         quote! {
-        #ident: jiuziai_macro_libs::types::e::E {
+        #ident: jiuziai_libs::types::e::E {
             code: #code,
             desc: #desc_clean,
             template: &[#(#template_vec),*],

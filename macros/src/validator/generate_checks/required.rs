@@ -1,9 +1,11 @@
 use crate::validator::generate_checks::get_validation_message;
-use crate::validator::types::MateInfo;
+use crate::validator::types::MetaInfo;
+use proc_macro2::Ident;
 use proc_macro2::TokenStream;
 use quote::quote;
 
-pub fn generate_required_check(info: &MateInfo) -> TokenStream {
+/// required 不参与 any/all 模式区分
+pub fn generate_required_check(info: &MetaInfo, label_identifier: &Ident) -> TokenStream {
     let required = match &info.required {
         Some(r) => r,
         None => return quote! {},
@@ -23,17 +25,15 @@ pub fn generate_required_check(info: &MateInfo) -> TokenStream {
         get_validation_message(&info.message, &required.message, "required", required.span);
 
     if info.message.is_some() {
-        // any 模式：有值就返回成功
         quote! {
-            if self.#name.is_some() {
-                return Ok(true);
+            if #label_identifier && self.#name.is_none() {
+                #label_identifier = false
             }
         }
     } else {
-        // all 模式：无值就返回错误
         quote! {
             if self.#name.is_none() {
-                return Err(#message);
+                return Err(#message)
             }
         }
     }

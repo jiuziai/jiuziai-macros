@@ -1,5 +1,5 @@
-use jiuziai_macro_core::Error;
-use jiuziai_macro_libs::e;
+use jiuziai_macros::Error;
+use jiuziai_libs::e;
 
 #[derive(Error)]
 #[allow(unused)]
