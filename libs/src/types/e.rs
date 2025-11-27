@@ -34,6 +34,8 @@ pub struct E {
     pub template: &'static [&'static str],
     #[serde(skip)]
     pub args: Vec<String>,
+    #[serde(skip)]
+    pub sources: Vec<String>,
 }
 
 impl E {
@@ -54,6 +56,7 @@ impl E {
             desc: desc_ref_static,
             template,
             args: Vec::new(),
+            sources: Vec::new(),
         }
     }
     pub fn get_code(&self) -> String {
@@ -79,20 +82,75 @@ impl E {
         desc
     }
 
-    pub fn get(&self) -> Self {
-        self.clone()
-    }
     pub fn with_arg(&self, arg: impl ToString) -> Self {
         Self {
             code: self.code,
             desc: self.desc,
             template: self.template,
             args: {
-                let mut new_args = self.args.clone();
-                new_args.push(arg.to_string());
-                new_args
+                let mut args = self.args.clone();
+                args.push(arg.to_string());
+                args
+            },
+            sources: self.sources.clone(),
+        }
+    }
+
+    pub fn with_source(&self, source: impl ToString) -> Self {
+        Self {
+            code: self.code,
+            desc: self.desc,
+            template: self.template,
+            args: self.args.clone(),
+            sources: {
+                let mut sources = self.sources.clone();
+                sources.push(source.to_string());
+                sources
             },
         }
+    }
+
+    pub fn with_args<I, S>(&self, args: I) -> Self
+    where
+        I: IntoIterator<Item = S>,
+        S: ToString,
+    {
+        Self {
+            code: self.code,
+            desc: self.desc,
+            template: self.template,
+            args: {
+                let mut new_args = self.args.clone();
+                new_args.extend(args.into_iter().map(|s| s.to_string()));
+                new_args
+            },
+            sources: self.sources.clone(),
+        }
+    }
+
+    pub fn with_sources<I, S>(&self, sources: I) -> Self
+    where
+        I: IntoIterator<Item = S>,
+        S: ToString,
+    {
+        Self {
+            code: self.code,
+            desc: self.desc,
+            template: self.template,
+            args: self.args.clone(),
+            sources: {
+                let mut new_sources = self.sources.clone();
+                new_sources.extend(sources.into_iter().map(|s| s.to_string()));
+                new_sources
+            },
+        }
+    }
+
+    pub fn get_string(&self) -> String {
+        format!(
+            r#"{{"code": "{}", "desc": "{}", "template": {:?}, "args": {:?}, "sources": {:?}}}"#,
+            self.code, self.desc, self.template, self.args, self.sources
+        )
     }
 }
 impl Serialize for E {

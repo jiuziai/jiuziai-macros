@@ -8,7 +8,7 @@ use syn::{
 };
 
 /// 解析整个 struct 输入，返回所有带 check 的字段（FieldInfo 列表）
-pub fn parse_struct(input: &DeriveInput) -> Result<Vec<MateInfo>> {
+pub fn parse_struct(input: &DeriveInput) -> Result<Vec<MetaInfo>> {
     let mut results = Vec::new();
     match &input.data {
         Data::Struct(DataStruct {
@@ -34,55 +34,84 @@ pub fn parse_struct(input: &DeriveInput) -> Result<Vec<MateInfo>> {
 }
 
 /// 解析一个 struct 字段上的 FieldInfo
-pub fn parse_field(field: &Field) -> Result<MateInfo> {
+pub fn parse_field(field: &Field) -> Result<MetaInfo> {
+    let depth:u8 = 0;
     let name = field
         .ident
         .clone()
         .ok_or_else(|| Error::new(field.span(), "Field must have ident"))?;
     let ty = field.ty.clone();
     let inner_ty = is_option_type(&ty).then(|| strip_option(&ty));
-    let mut info = MateInfo::new(name, ty, inner_ty, field.span());
+    let mut info = MetaInfo::new(name, ty, inner_ty, field.span());
     for attr in &field.attrs {
         if attr.path().is_ident("check") {
             let metas: Punctuated<Meta, Token![,]> =
                 attr.parse_args_with(Punctuated::<Meta, Token![,]>::parse_terminated)?;
             for meta in &metas {
-                parse_check_meta(meta, &mut info, 0)?;
+                parse_check_meta(meta, &mut info, depth)?;
             }
         }
     }
+    check_field_info_boundary(&mut info, depth)?;
     Ok(info)
 }
 
 /// 递归解析 #[check(...)] 每个 Meta
-pub fn parse_check_meta(meta: &Meta, info: &mut MateInfo, deep: u8) -> Result<()> {
+pub fn parse_check_meta(meta: &Meta, info: &mut MetaInfo, depth: u8) -> Result<()> {
     match meta {
         Meta::Path(path) => {
             if let Some(ident) = path.get_ident() {
-                if ident == "deep" {
-                    if deep > 0 {
+                match ident.to_string().as_str() {
+                    "deep" => {
+                        if depth > 0 {
+                            return Err(Error::new(
+                                path.span(),
+                                "Does not allow deeper depth verification",
+                            ));
+                        }
+                        if info.deep.is_some() {
+                            return Err(Error::new(path.span(), "`deep` attribute already exists"));
+                        }
+                        info.deep = Some(Box::from(MetaInfo::new(
+                            info.name.clone(),
+                            info.ty.clone(),
+                            info.option_ty.clone(),
+                            path.span(),
+                        )))
+                    }
+                    "traits" => {
+                        if depth == 0 {
+                            return Err(Error::new(
+                                path.span(),
+                                "The `traits` attribute is not allowed at the top level",
+                            ));
+                        }
+                        exists_check(&info.traits, path.span(), "traits")?;
+                        info.traits = Some(BoolCheck::new(None, path.span()));
+                    }
+                    "required" => {
+                        exists_check(&info.required, path.span(), "required")?;
+                        info.required = Some(BoolCheck::new(None, path.span()));
+                    }
+                    "not_empty" => {
+                        exists_check(&info.not_empty, path.span(), "not_empty")?;
+                        info.not_empty = Some(BoolCheck::new(None, path.span()));
+                    }
+                    "not_blank" => {
+                        exists_check(&info.not_blank, path.span(), "not_blank")?;
+                        info.not_blank = Some(BoolCheck::new(None, path.span()));
+                    }
+                    "no_space" => {
+                        exists_check(&info.no_space, path.span(), "no_space")?;
+                        info.no_space = Some(BoolCheck::new(None, path.span()));
+                    }
+                    _ => {
                         return Err(Error::new(
                             path.span(),
-                            "Does not allow deeper depth verification",
+                            format!("Unknown unary check: {}", ident),
                         ));
                     }
-                    if info.deep.is_some() {
-                        return Err(Error::new(path.span(), "`deep` attribute already exists"));
-                    }
-                    info.deep = Some(Box::from(MateInfo::new(
-                        info.name.clone(),
-                        info.ty.clone(),
-                        info.option_ty.clone(),
-                        path.span(),
-                    )))
-                } else {
-                    return Err(Error::new(
-                        path.span(),
-                        format!("Unknown unary check: {}", ident),
-                    ));
                 }
-            } else {
-                return Err(Error::new(path.span(), "Expected identifier in Meta::Path"));
             }
         }
         Meta::NameValue(nv) => {
@@ -139,7 +168,7 @@ pub fn parse_check_meta(meta: &Meta, info: &mut MateInfo, deep: u8) -> Result<()
                 "regex" => parse_regex_check(info, &args)?,
                 "func" => parse_func_check(info, &args)?,
                 "group" => {
-                    if deep > 0 {
+                    if depth > 0 {
                         return Err(Error::new(
                             group_name.span(),
                             "Deep validation does not allow the use of `group`",
@@ -147,8 +176,17 @@ pub fn parse_check_meta(meta: &Meta, info: &mut MateInfo, deep: u8) -> Result<()
                     }
                     parse_group_check(info, &args)
                 }?,
+                "traits" => {
+                    if depth == 0 {
+                        return Err(Error::new(
+                            group_name.span(),
+                            "The `traits` attribute is not allowed at the top level",
+                        ));
+                    }
+                    parse_traits_check(info, &args)?
+                }
                 "deep" => {
-                    if deep > 1 {
+                    if depth > 1 {
                         return Err(Error::new(
                             group_name.span(),
                             "Does not allow deeper depth verification",
@@ -156,32 +194,30 @@ pub fn parse_check_meta(meta: &Meta, info: &mut MateInfo, deep: u8) -> Result<()
                     }
 
                     // 创建 deep 信息
-                    let mut deep_info = MateInfo::new(
+                    let mut deep_info = MetaInfo::new(
                         info.name.clone(),
                         info.ty.clone(),
                         info.option_ty.clone(),
                         group_name.span(),
                     );
 
-                    if is_collection(&deep_info.ty) {
-                        if let Some(elem_ty) = get_collection_element_type(&info.ty) {
-                            deep_info.ty = elem_ty.clone();
-                            if is_option_type(&deep_info.ty) {
-                                deep_info.option_ty = Some(strip_option(&deep_info.ty));
-                            } else {
-                                deep_info.option_ty = None
-                            }
-                        }else {
-                            return Err(Error::new(
-                                group_name.span(),
-                                "Failed to parse collection element type",
-                            ));
-                        }
-                    }
+                    // if is_collection(&deep_info.ty) {
+                    //     let elem_ty = get_collection_element_type(
+                    //         &info.name,
+                    //         &info.span,
+                    //         &strip_option(&info.ty),
+                    //     )?;
+                    //     deep_info.ty = elem_ty.clone();
+                    //     if is_option_type(&deep_info.ty) {
+                    //         deep_info.option_ty = Some(strip_option(&deep_info.ty));
+                    //     } else {
+                    //         deep_info.option_ty = None
+                    //     }
+                    // }
 
                     // 遍历 args 中的每个 meta，分别解析
                     for meta in &args {
-                        parse_check_meta(meta, &mut deep_info, deep + 1)?;
+                        parse_check_meta(meta, &mut deep_info, depth + 1)?;
                     }
 
                     info.deep = Some(Box::new(deep_info));
@@ -195,12 +231,12 @@ pub fn parse_check_meta(meta: &Meta, info: &mut MateInfo, deep: u8) -> Result<()
             }
         }
     }
-    check_field_info_boundary(info)
+    Ok(())
 }
 
 // RequiredCheck
 
-pub fn parse_required_check(info: &mut MateInfo, args: &Punctuated<Meta, Token![,]>) -> Result<()> {
+pub fn parse_required_check(info: &mut MetaInfo, args: &Punctuated<Meta, Token![,]>) -> Result<()> {
     exists_check(&info.required, args.span(), "required")?;
     info.required = Some(parse_bool(args)?);
     Ok(())
@@ -208,7 +244,7 @@ pub fn parse_required_check(info: &mut MateInfo, args: &Punctuated<Meta, Token![
 // RequiredCheck
 
 pub fn parse_not_empty_check(
-    info: &mut MateInfo,
+    info: &mut MetaInfo,
     args: &Punctuated<Meta, Token![,]>,
 ) -> Result<()> {
     exists_check(&info.not_empty, args.span(), "not_empty")?;
@@ -219,7 +255,7 @@ pub fn parse_not_empty_check(
 // RequiredCheck
 
 pub fn parse_not_blank_check(
-    info: &mut MateInfo,
+    info: &mut MetaInfo,
     args: &Punctuated<Meta, Token![,]>,
 ) -> Result<()> {
     exists_check(&info.not_blank, args.span(), "not_blank")?;
@@ -229,39 +265,39 @@ pub fn parse_not_blank_check(
 
 // RequiredCheck
 
-pub fn parse_no_space_check(info: &mut MateInfo, args: &Punctuated<Meta, Token![,]>) -> Result<()> {
+pub fn parse_no_space_check(info: &mut MetaInfo, args: &Punctuated<Meta, Token![,]>) -> Result<()> {
     exists_check(&info.no_space, args.span(), "no_space")?;
     info.no_space = Some(parse_bool(args)?);
     Ok(())
 }
 
 // SizeCheck
-pub fn parse_size_check(info: &mut MateInfo, args: &Punctuated<Meta, Token![,]>) -> Result<()> {
+pub fn parse_size_check(info: &mut MetaInfo, args: &Punctuated<Meta, Token![,]>) -> Result<()> {
     exists_check(&info.size, args.span(), "size")?;
     info.size = Some(parse_min_max(args)?);
     Ok(())
 }
 // RangeCheck
-pub fn parse_range_check(info: &mut MateInfo, args: &Punctuated<Meta, Token![,]>) -> Result<()> {
+pub fn parse_range_check(info: &mut MetaInfo, args: &Punctuated<Meta, Token![,]>) -> Result<()> {
     exists_check(&info.range, args.span(), "range")?;
     info.range = Some(parse_min_max(args)?);
     Ok(())
 }
 // WithinCheck
-pub fn parse_within_check(info: &mut MateInfo, args: &Punctuated<Meta, Token![,]>) -> Result<()> {
+pub fn parse_within_check(info: &mut MetaInfo, args: &Punctuated<Meta, Token![,]>) -> Result<()> {
     exists_check(&info.within, args.span(), "within")?;
     info.within = Some(parse_values(args)?);
     Ok(())
 }
 // WithOutCheck
-pub fn parse_out_of_check(info: &mut MateInfo, args: &Punctuated<Meta, Token![,]>) -> Result<()> {
+pub fn parse_out_of_check(info: &mut MetaInfo, args: &Punctuated<Meta, Token![,]>) -> Result<()> {
     exists_check(&info.out_of, args.span(), "out_of")?;
     info.out_of = Some(parse_values(args)?);
     Ok(())
 }
 
 // RegexCheck
-pub fn parse_regex_check(info: &mut MateInfo, args: &Punctuated<Meta, Token![,]>) -> Result<()> {
+pub fn parse_regex_check(info: &mut MetaInfo, args: &Punctuated<Meta, Token![,]>) -> Result<()> {
     exists_check(&info.regex, args.span(), "regex")?;
 
     let mut refer: Option<Expr> = None; // 改为 Expr 类型
@@ -327,7 +363,7 @@ pub fn parse_regex_check(info: &mut MateInfo, args: &Punctuated<Meta, Token![,]>
 }
 
 // FuncCheck
-pub fn parse_func_check(info: &mut MateInfo, args: &Punctuated<Meta, Token![,]>) -> Result<()> {
+pub fn parse_func_check(info: &mut MetaInfo, args: &Punctuated<Meta, Token![,]>) -> Result<()> {
     exists_check(&info.func, args.span(), "func")?;
 
     let mut handler: Option<Expr> = None;
@@ -365,8 +401,28 @@ pub fn parse_func_check(info: &mut MateInfo, args: &Punctuated<Meta, Token![,]>)
 
     Ok(())
 }
+
+// TraitCheck
+pub fn parse_traits_check(info: &mut MetaInfo, args: &Punctuated<Meta, Token![,]>) -> Result<()> {
+    exists_check(&info.traits, args.span(), "traits")?;
+
+    if !args.is_empty() {
+        return Err(Error::new(
+            args.span(),
+            "`traits` cannot contain any parameters",
+        ));
+    }
+
+    info.traits = Some(BoolCheck {
+        message: None,
+        span: args.span(),
+    });
+
+    Ok(())
+}
+
 // GroupCheck
-pub fn parse_group_check(info: &mut MateInfo, args: &Punctuated<Meta, Token![,]>) -> Result<()> {
+pub fn parse_group_check(info: &mut MetaInfo, args: &Punctuated<Meta, Token![,]>) -> Result<()> {
     if info.group.is_some() {
         return Err(Error::new(args.span(), "`group` attribute already exists"));
     }

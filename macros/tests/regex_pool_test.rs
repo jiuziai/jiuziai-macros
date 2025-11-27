@@ -1,4 +1,4 @@
-use jiuziai_macro_core::RegexPool;
+use jiuziai_macros::RegexPool;
 
 #[allow(dead_code)]
 #[derive(RegexPool)]

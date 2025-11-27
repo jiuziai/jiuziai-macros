@@ -1,11 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <module type="EMPTY_MODULE" version="4">
   <component name="NewModuleRootManager">
-    <content url="file://$MODULE_DIR$">
-      <sourceFolder url="file://$MODULE_DIR$/libs/src" isTestSource="false" />
-      <sourceFolder url="file://$MODULE_DIR$/core/src" isTestSource="false" />
-      <sourceFolder url="file://$MODULE_DIR$/core/tests" isTestSource="true" />
-      <excludeFolder url="file://$MODULE_DIR$/target" />
+    <content url="file://$MODULE_DIR$/../crates">
+      <sourceFolder url="file://$MODULE_DIR$/../crates/errors/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/../crates/libs/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/../crates/macros/src" isTestSource="false" />
+      <sourceFolder url="file://$MODULE_DIR$/../crates/macros/tests" isTestSource="true" />
+      <excludeFolder url="file://$MODULE_DIR$/../crates/target" />
     </content>
     <orderEntry type="inheritedJdk" />
     <orderEntry type="sourceFolder" forTests="false" />

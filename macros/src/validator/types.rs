@@ -2,7 +2,7 @@ use proc_macro2::{Ident, Span};
 use syn::{Expr, Type};
 
 #[derive(Debug, Clone)]
-pub struct MateInfo {
+pub struct MetaInfo {
     pub name: Ident,
     pub ty: Type,
     pub option_ty: Option<Type>,
@@ -19,20 +19,22 @@ pub struct MateInfo {
     pub regex: Option<RegexCheck>,
     pub func: Option<FuncCheck>,
 
-    pub deep: Option<Box<MateInfo>>,
+    pub deep: Option<Box<MetaInfo>>,
     pub message: Option<String>,
     pub group: Option<Vec<Expr>>,
+
+    pub traits: Option<BoolCheck>,
 }
-impl MateInfo {
+impl MetaInfo {
     pub fn new(name: Ident, ty: Type, option_ty: Option<Type>, span: Span) -> Self {
         Self {
             name,
             ty,
             option_ty,
             span,
-            
-            required:None,
-            not_empty:None,
+
+            required: None,
+            not_empty: None,
             not_blank: None,
             no_space: None,
             size: None,
@@ -44,6 +46,8 @@ impl MateInfo {
             deep: None,
             message: None,
             group: None,
+
+            traits: None,
         }
     }
 }
@@ -77,4 +81,10 @@ pub struct FuncCheck {
     pub handler: Expr,
     pub message: Option<String>,
     pub span: Span,
+}
+
+impl BoolCheck {
+    pub fn new(message: Option<String>, span: Span) -> Self {
+        Self { message, span }
+    }
 }
