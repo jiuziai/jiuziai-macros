@@ -4,11 +4,7 @@ use crate::validator::types::MetaInfo;
 use proc_macro2::TokenStream;
 use quote::quote;
 
-pub fn generate_deep_check(
-    info: &MetaInfo,
-    group: Option<&syn::Expr>,
-    deep: u8,
-) -> TokenStream {
+pub fn generate_deep_check(info: &MetaInfo, group: Option<&syn::Expr>, depth: u8) -> TokenStream {
     let deep_info = match &info.deep {
         Some(d) => d,
         None => return quote! {},
@@ -17,12 +13,12 @@ pub fn generate_deep_check(
     let name = &deep_info.name;
 
     // 检查是否是集合类型
-    let is_collection = is_collection(&info.ty);
+    let is_collection = is_collection(&deep_info.ty);
 
     if is_collection {
         // 集合类型：使用基本校验 + 尝试特性
         // 生成基本校验
-        let basic_checks = generate_single_field(&deep_info, group, deep);
+        let basic_checks = generate_single_field(&deep_info, group,  depth);
 
         // 生成特性校验
         let trait_check: TokenStream;

@@ -25,7 +25,7 @@ pub fn generate_validate_impl(struct_name: &Ident, check_list: &[MetaInfo]) -> T
 pub fn generate_field_checks(check_list: &[MetaInfo], group: Option<&syn::Expr>) -> TokenStream {
     let mut checks = TokenStream::new();
     for check_info in check_list {
-        checks.extend(generate_single_field(check_info, group, 0));
+        checks.extend(generate_single_field(check_info, group,0));
     }
     checks
 }

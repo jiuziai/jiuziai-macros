@@ -22,16 +22,26 @@ pub fn expand_error_pool(base_name: &str, fields: &[FieldInfo]) -> proc_macro2::
         let ident = &f.ident;
         let code = &f.code;
         let desc = &f.desc;
-        let desc_clean = desc.replace(r"\{", "{").replace(r"\}", "}");
-        let template_vec: Vec<&str> = desc_clean.split("{}").collect();
+        let template_vec: Vec<&str> = desc.split("{}").collect();
+        // 处理模板数组中的转义
+        let template: Vec<String> = template_vec
+            .iter()
+            .map(
+                |s| {
+                    s.replace(r"\{", "{") // 把 \{ 替换为 {
+                        .replace(r"\}", "}")
+                }, // 把 \} 替换为 }
+            )
+            .collect();
         quote! {
-        #ident: jiuziai_libs::types::e::E {
-            code: #code,
-            desc: #desc_clean,
-            template: &[#(#template_vec),*],
-            args: Vec::new(),
+            #ident: jiuziai_libs::types::e::E {
+                code: #code,
+                desc: #desc,
+                template: &[#(#template),*],
+                args: Vec::new(),
+                sources: Vec::new(),
+            }
         }
-    }
     });
 
     quote! {

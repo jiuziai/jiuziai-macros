@@ -6,7 +6,7 @@ use crate::validator::types::MetaInfo;
 use proc_macro2::{Ident, TokenStream};
 use quote::quote;
 
-pub fn generate_out_of_check(info: &MetaInfo,is_coll:bool, label_identifier: &Ident) -> TokenStream {
+pub fn generate_out_of_check(info: &MetaInfo, depth: u8, label_identifier: &Ident) -> TokenStream {
     let out_of = match &info.out_of {
         Some(r) => r,
         None => return quote! {},
@@ -17,7 +17,7 @@ pub fn generate_out_of_check(info: &MetaInfo,is_coll:bool, label_identifier: &Id
 
     let (any_cond, all_cond) = if is_collection(&info.ty) {
         // 集合类型：检查集合中是否包含任何排除值
-        generate_option_condition(info, |var| {
+        generate_option_condition(info, depth, |var| {
             if is_string_collection(&info.ty) {
                 // 字符串集合：需要将元素转换为 &str 比较
                 quote! { #var.iter().any(|item| matches!(item.as_str(), #( #values )|*)) }
@@ -28,10 +28,14 @@ pub fn generate_out_of_check(info: &MetaInfo,is_coll:bool, label_identifier: &Id
         })
     } else if is_string_type(&info.ty) {
         // 标量字符串类型
-        generate_option_condition(info, |var| quote! {!matches!(#var.as_str(), #( #values )|*)})
+        generate_option_condition(
+            info,
+            depth,
+            |var| quote! {!matches!(#var.as_str(), #( #values )|*)},
+        )
     } else {
         // 其他标量类型
-        generate_option_condition(info, |var| quote! {!matches!(#var, #( #values )|*)})
+        generate_option_condition(info, depth, |var| quote! {!matches!(#var, #( #values )|*)})
     };
 
     generate_validation_code(info, message, any_cond, all_cond, label_identifier)

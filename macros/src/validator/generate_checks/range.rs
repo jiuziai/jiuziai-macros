@@ -5,7 +5,11 @@ use crate::validator::types::MetaInfo;
 use proc_macro2::{Ident, TokenStream};
 use quote::quote;
 
-pub fn generate_range_check(info: &MetaInfo, is_coll:bool,label_identifier: &Ident) -> TokenStream {
+pub fn generate_range_check(
+    info: &MetaInfo,
+    depth: u8,
+    label_identifier: &Ident,
+) -> TokenStream {
     let range = match &info.range {
         Some(r) => r,
         None => return quote! {},
@@ -14,7 +18,7 @@ pub fn generate_range_check(info: &MetaInfo, is_coll:bool,label_identifier: &Ide
     let message = get_validation_message(&info.message, &range.message, "range", range.span);
 
     // 生成 min 和 max 检查
-    let (any_cond, all_cond) = generate_option_condition(info, |var| {
+    let (any_cond, all_cond) = generate_option_condition(info, depth, |var| {
         // 在闭包内部生成条件，这样 var 会被正确替换
         let min_check = if let Some(min_expr) = &range.min {
             quote! { #var >= #min_expr }
@@ -31,5 +35,5 @@ pub fn generate_range_check(info: &MetaInfo, is_coll:bool,label_identifier: &Ide
         quote! { #min_check && #max_check }
     });
 
-    generate_validation_code(info, message, any_cond, all_cond,label_identifier)
+    generate_validation_code(info, message, any_cond, all_cond, label_identifier)
 }

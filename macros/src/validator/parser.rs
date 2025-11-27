@@ -35,6 +35,7 @@ pub fn parse_struct(input: &DeriveInput) -> Result<Vec<MetaInfo>> {
 
 /// 解析一个 struct 字段上的 FieldInfo
 pub fn parse_field(field: &Field) -> Result<MetaInfo> {
+    let depth:u8 = 0;
     let name = field
         .ident
         .clone()
@@ -47,22 +48,22 @@ pub fn parse_field(field: &Field) -> Result<MetaInfo> {
             let metas: Punctuated<Meta, Token![,]> =
                 attr.parse_args_with(Punctuated::<Meta, Token![,]>::parse_terminated)?;
             for meta in &metas {
-                parse_check_meta(meta, &mut info, 0)?;
+                parse_check_meta(meta, &mut info, depth)?;
             }
         }
     }
-    check_field_info_boundary(&mut info)?;
+    check_field_info_boundary(&mut info, depth)?;
     Ok(info)
 }
 
 /// 递归解析 #[check(...)] 每个 Meta
-pub fn parse_check_meta(meta: &Meta, info: &mut MetaInfo, deep: u8) -> Result<()> {
+pub fn parse_check_meta(meta: &Meta, info: &mut MetaInfo, depth: u8) -> Result<()> {
     match meta {
         Meta::Path(path) => {
             if let Some(ident) = path.get_ident() {
                 match ident.to_string().as_str() {
                     "deep" => {
-                        if deep > 0 {
+                        if depth > 0 {
                             return Err(Error::new(
                                 path.span(),
                                 "Does not allow deeper depth verification",
@@ -79,7 +80,7 @@ pub fn parse_check_meta(meta: &Meta, info: &mut MetaInfo, deep: u8) -> Result<()
                         )))
                     }
                     "traits" => {
-                        if deep == 0 {
+                        if depth == 0 {
                             return Err(Error::new(
                                 path.span(),
                                 "The `traits` attribute is not allowed at the top level",
@@ -167,7 +168,7 @@ pub fn parse_check_meta(meta: &Meta, info: &mut MetaInfo, deep: u8) -> Result<()
                 "regex" => parse_regex_check(info, &args)?,
                 "func" => parse_func_check(info, &args)?,
                 "group" => {
-                    if deep > 0 {
+                    if depth > 0 {
                         return Err(Error::new(
                             group_name.span(),
                             "Deep validation does not allow the use of `group`",
@@ -176,7 +177,7 @@ pub fn parse_check_meta(meta: &Meta, info: &mut MetaInfo, deep: u8) -> Result<()
                     parse_group_check(info, &args)
                 }?,
                 "traits" => {
-                    if deep == 0 {
+                    if depth == 0 {
                         return Err(Error::new(
                             group_name.span(),
                             "The `traits` attribute is not allowed at the top level",
@@ -185,7 +186,7 @@ pub fn parse_check_meta(meta: &Meta, info: &mut MetaInfo, deep: u8) -> Result<()
                     parse_traits_check(info, &args)?
                 }
                 "deep" => {
-                    if deep > 1 {
+                    if depth > 1 {
                         return Err(Error::new(
                             group_name.span(),
                             "Does not allow deeper depth verification",
@@ -200,26 +201,23 @@ pub fn parse_check_meta(meta: &Meta, info: &mut MetaInfo, deep: u8) -> Result<()
                         group_name.span(),
                     );
 
-                    if is_collection(&deep_info.ty) {
-                        if let Some(elem_ty) = get_collection_element_type(&strip_option(&info.ty))
-                        {
-                            deep_info.ty = elem_ty.clone();
-                            if is_option_type(&deep_info.ty) {
-                                deep_info.option_ty = Some(strip_option(&deep_info.ty));
-                            } else {
-                                deep_info.option_ty = None
-                            }
-                        } else {
-                            return Err(Error::new(
-                                group_name.span(),
-                                "Failed to parse collection element type",
-                            ));
-                        }
-                    }
+                    // if is_collection(&deep_info.ty) {
+                    //     let elem_ty = get_collection_element_type(
+                    //         &info.name,
+                    //         &info.span,
+                    //         &strip_option(&info.ty),
+                    //     )?;
+                    //     deep_info.ty = elem_ty.clone();
+                    //     if is_option_type(&deep_info.ty) {
+                    //         deep_info.option_ty = Some(strip_option(&deep_info.ty));
+                    //     } else {
+                    //         deep_info.option_ty = None
+                    //     }
+                    // }
 
                     // 遍历 args 中的每个 meta，分别解析
                     for meta in &args {
-                        parse_check_meta(meta, &mut deep_info, deep + 1)?;
+                        parse_check_meta(meta, &mut deep_info, depth + 1)?;
                     }
 
                     info.deep = Some(Box::new(deep_info));
